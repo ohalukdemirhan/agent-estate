@@ -1,0 +1,580 @@
+<title>ECOM — a registry for unattended software estates</title>
+
+<style>
+:root{
+  --ink:#14131C; --ink-2:#1E1C29;
+  --paper:#E7E5EC; --paper-2:#DCD9E3;
+  --brass:#8A6D22; --brass-lit:#C2A15A;
+  --verdigris:#2F6559; --oxide:#973E33;
+
+  --bg:var(--paper); --bg-raised:#EFEEF3; --bg-sunken:var(--paper-2);
+  --fg:var(--ink); --fg-soft:#4A4759; --fg-faint:#6E6B7E;
+  --rule:#C3BFCE; --rule-soft:#D4D1DC;
+  --accent:var(--brass); --good:var(--verdigris); --crit:var(--oxide); --seal:#8A6D22;
+
+  --display:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,"URW Palladio L",Georgia,serif;
+  --body:Charter,"Bitstream Charter","Sitka Text",Georgia,"Times New Roman",serif;
+  --data:ui-monospace,"SF Mono",SFMono-Regular,Menlo,"DejaVu Sans Mono","Liberation Mono",monospace;
+
+  --measure:68ch; --gutter:5.5rem;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:var(--ink); --bg-raised:var(--ink-2); --bg-sunken:#100F17;
+    --fg:#E3E0EA; --fg-soft:#ADA9BC; --fg-faint:#837F94;
+    --rule:#332F42; --rule-soft:#282436;
+    --accent:var(--brass-lit); --good:#5EA294; --crit:#C97166; --seal:var(--brass-lit);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:var(--ink); --bg-raised:var(--ink-2); --bg-sunken:#100F17;
+  --fg:#E3E0EA; --fg-soft:#ADA9BC; --fg-faint:#837F94;
+  --rule:#332F42; --rule-soft:#282436;
+  --accent:var(--brass-lit); --good:#5EA294; --crit:#C97166; --seal:var(--brass-lit);
+}
+:root[data-theme="light"]{
+  --bg:var(--paper); --bg-raised:#EFEEF3; --bg-sunken:var(--paper-2);
+  --fg:var(--ink); --fg-soft:#4A4759; --fg-faint:#6E6B7E;
+  --rule:#C3BFCE; --rule-soft:#D4D1DC;
+  --accent:var(--brass); --good:var(--verdigris); --crit:var(--oxide); --seal:var(--brass);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.wrap{max-width:calc(var(--measure) + var(--gutter) + 3rem);margin:0 auto;padding:0 1.5rem}
+
+/* hero */
+.hero{border-bottom:1px solid var(--rule);padding:4.5rem 0 3.5rem}
+.hero-inner{display:grid;grid-template-columns:1fr minmax(0,20rem);gap:3.5rem;align-items:center}
+@media (max-width:820px){.hero-inner{grid-template-columns:1fr;gap:2.5rem}}
+.eyebrow{font-family:var(--data);font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--fg-faint);margin:0 0 1.4rem}
+.eyebrow b{color:var(--accent);font-weight:400}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(2.4rem,5.6vw,3.6rem);line-height:1.07;letter-spacing:-.015em;text-wrap:balance;margin:0 0 1.2rem}
+h1 em{font-style:italic;color:var(--accent)}
+.standfirst{font-size:1.12rem;color:var(--fg-soft);max-width:46ch;margin:0 0 2rem}
+.hero-meta{display:flex;flex-wrap:wrap;gap:0 2.2rem;font-family:var(--data);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.hero-meta span b{display:block;font-size:1.45rem;letter-spacing:0;color:var(--fg);font-variant-numeric:tabular-nums;margin-top:.15rem}
+
+/* the single motif */
+.seal{width:100%;height:auto;overflow:visible}
+.seal .ring,.seal .spoke,.seal .frame{fill:none;stroke:var(--seal);vector-effect:non-scaling-stroke}
+.seal .ring{stroke-width:1}
+.seal .frame{stroke-width:.6;opacity:.4}
+.seal .spoke{stroke-width:.6;opacity:.5}
+.seal .node{fill:var(--bg);stroke:var(--seal);stroke-width:1}
+.seal .core{fill:var(--seal);opacity:.9}
+.seal text{font-family:var(--data);font-size:5.6px;letter-spacing:.14em;fill:var(--fg-soft);text-anchor:middle}
+.seal .glyph{font-family:var(--display);font-size:7.5px;fill:var(--seal)}
+@media (prefers-reduced-motion: no-preference){
+  .seal .draw{stroke-dasharray:1200;stroke-dashoffset:1200;animation:scribe 2.2s cubic-bezier(.4,0,.2,1) forwards}
+  .seal .fade{opacity:0;animation:surface .9s ease-out 1.4s forwards}
+  .seal .node{opacity:0;animation:surface .6s ease-out 1.8s forwards}
+}
+@keyframes scribe{to{stroke-dashoffset:0}}
+@keyframes surface{to{opacity:1}}
+
+/* sections */
+section{padding:3.4rem 0;border-bottom:1px solid var(--rule-soft)}
+.col{display:grid;grid-template-columns:var(--gutter) minmax(0,var(--measure));gap:0 2.5rem}
+@media (max-width:820px){.col{grid-template-columns:1fr}.rail{margin-bottom:1rem}}
+.rail{font-family:var(--data);font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-faint);padding-top:.5rem;border-top:2px solid var(--accent);align-self:start}
+h2{font-family:var(--display);font-weight:400;font-size:clamp(1.55rem,3.2vw,2rem);line-height:1.15;letter-spacing:-.01em;text-wrap:balance;margin:0 0 1.1rem}
+h3{font-family:var(--data);font-size:.72rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-faint);margin:2.4rem 0 .8rem}
+p{margin:0 0 1.1rem}
+.lede{font-size:1.05rem;color:var(--fg-soft)}
+a{color:var(--accent);text-underline-offset:.2em;text-decoration-thickness:.5px}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+em.term{font-style:normal;font-family:var(--data);font-size:.86em;color:var(--fg)}
+
+/* status pills */
+.pill{display:inline-block;font-family:var(--data);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.18rem .55rem;border:1px solid currentColor;border-radius:999px;white-space:nowrap}
+.pill.live{color:var(--good)}
+.pill.roll{color:var(--accent)}
+.pill.none{color:var(--fg-faint)}
+.pill.sev{color:var(--crit)}
+.pill.wait{color:var(--accent)}
+.pill.ok{color:var(--good)}
+
+/* stage ladder */
+.stages{list-style:none;margin:1.4rem 0 0;padding:0}
+.stages li{border-top:1px solid var(--rule-soft);padding:1.15rem 0}
+.stages .head{display:flex;flex-wrap:wrap;gap:.6rem;align-items:baseline;margin-bottom:.35rem}
+.stages .name{font-family:var(--display);font-size:1.12rem}
+.stages p{margin:0 0 .5rem;color:var(--fg-soft);font-size:.97rem}
+.stages .measure{font-family:var(--data);font-size:.7rem;color:var(--fg-faint);letter-spacing:.03em}
+.stages .measure b{color:var(--fg-soft);font-weight:400}
+
+/* registers */
+.regs{display:grid;gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft);margin:1.5rem 0 0}
+.reg{background:var(--bg);padding:1.1rem 1.2rem}
+.reg h4{font-family:var(--display);font-weight:400;font-size:1.12rem;margin:0 0 .25rem}
+.reg p{font-size:.94rem;color:var(--fg-soft);margin:0 0 .45rem}
+.reg .tools{font-family:var(--data);font-size:.68rem;color:var(--fg-faint);line-height:1.7}
+
+/* rules */
+.rules{list-style:none;margin:1.4rem 0 0;padding:0;counter-reset:rule}
+.rules li{counter-increment:rule;border-top:1px solid var(--rule-soft);padding:.95rem 0 .95rem 2.6rem;position:relative}
+.rules li::before{content:counter(rule);position:absolute;left:0;top:1rem;font-family:var(--data);font-size:.72rem;color:var(--accent)}
+.rules b{font-family:var(--display);font-weight:400;font-size:1.08rem;display:block;margin-bottom:.15rem}
+.rules span{color:var(--fg-soft);font-size:.96rem}
+
+/* tables */
+.scroller{overflow-x:auto;margin:1.2rem 0 .4rem;border:1px solid var(--rule-soft)}
+table{border-collapse:collapse;width:100%;font-family:var(--data);font-size:.75rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+caption{caption-side:bottom;text-align:left;font-family:var(--data);font-size:.67rem;color:var(--fg-faint);padding:.7rem .9rem;white-space:normal;line-height:1.6}
+th{text-align:left;font-weight:600;font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-faint);padding:.65rem .9rem;border-bottom:1px solid var(--rule);background:var(--bg-sunken)}
+td{padding:.6rem .9rem;border-bottom:1px solid var(--rule-soft);color:var(--fg-soft);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td.k{color:var(--fg)}
+.red{background:var(--rule);color:transparent;border-radius:1px;padding:0 .1em;user-select:none}
+.sev-bar{display:inline-block;color:var(--crit);letter-spacing:.12em}
+
+/* build log */
+.log{margin:1.4rem 0 0}
+.entry{border-top:1px solid var(--rule-soft);padding:1.3rem 0}
+.entry-head{display:flex;flex-wrap:wrap;gap:.4rem 1rem;align-items:baseline;margin-bottom:.7rem}
+.entry-head .wk{font-family:var(--display);font-size:1.1rem}
+.entry-head .dates{font-family:var(--data);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.entry h5{font-family:var(--data);font-size:.64rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-faint);margin:.9rem 0 .35rem}
+.entry ul{margin:0;padding-left:1.1rem;color:var(--fg-soft);font-size:.96rem}
+.entry li{margin-bottom:.4rem}
+.ref{font-family:var(--data);font-size:.66rem;color:var(--fg-faint);white-space:nowrap}
+
+/* corrections */
+.corr{list-style:none;margin:1.3rem 0 0;padding:0}
+.corr li{border-top:1px solid var(--rule-soft);padding:.85rem 0;display:grid;grid-template-columns:6.5rem 1fr;gap:0 1rem}
+@media (max-width:600px){.corr li{grid-template-columns:1fr}}
+.corr time{font-family:var(--data);font-size:.68rem;color:var(--fg-faint);letter-spacing:.06em;padding-top:.18rem}
+.corr p{margin:0;font-size:.96rem;color:var(--fg-soft)}
+.corr b{color:var(--fg);font-weight:600}
+
+/* code */
+pre{margin:1.2rem 0;padding:1.05rem 1.15rem;background:var(--bg-sunken);border:1px solid var(--rule-soft);border-left:2px solid var(--accent);overflow-x:auto;font-family:var(--data);font-size:.77rem;line-height:1.65;color:var(--fg)}
+pre .c{color:var(--fg-faint)}
+pre .s{color:var(--good)}
+code{font-family:var(--data);font-size:.86em;color:var(--fg)}
+
+.pull{margin:2rem 0;padding:1.2rem 0 1.2rem 1.3rem;border-left:2px solid var(--accent);font-family:var(--display);font-size:1.25rem;line-height:1.35;text-wrap:balance}
+.pull small{display:block;font-family:var(--data);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-faint);margin-top:.65rem}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 2.4rem}
+@media (max-width:700px){.two{grid-template-columns:1fr;gap:0}}
+.two ul{margin:.2rem 0 1.2rem;padding-left:1.1rem;color:var(--fg-soft);font-size:.96rem}
+.two li{margin-bottom:.45rem}
+
+/* newsletter */
+.sub{border:1px solid var(--rule);background:var(--bg-raised);padding:1.4rem 1.5rem;margin:1.4rem 0 0}
+.sub form{display:flex;flex-wrap:wrap;gap:.6rem;margin:.9rem 0 .6rem}
+.sub input[type=email]{flex:1 1 16rem;min-width:0;font-family:var(--data);font-size:.82rem;padding:.6rem .75rem;background:var(--bg);color:var(--fg);border:1px solid var(--rule)}
+.sub button{font-family:var(--data);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;padding:.6rem 1.1rem;background:var(--accent);color:var(--bg);border:1px solid var(--accent);cursor:pointer}
+.sub button:hover{background:transparent;color:var(--accent)}
+.sub .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.sub .note{font-family:var(--data);font-size:.67rem;color:var(--fg-faint);line-height:1.7;margin:0}
+.sub [role=status]{font-family:var(--data);font-size:.72rem;color:var(--good);min-height:1.2em;margin:0 0 .3rem}
+
+footer{padding:3rem 0 4rem;font-family:var(--data);font-size:.7rem;line-height:1.9;color:var(--fg-faint);letter-spacing:.04em}
+footer .rule{height:1px;background:var(--rule);margin-bottom:1.6rem}
+footer b{color:var(--fg-soft);font-weight:400}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="hero-inner">
+    <div>
+      <p class="eyebrow">An anonymous open protocol · <b>MCP</b> · self-hosted · MIT</p>
+      <h1>Agents draft and run the routine. <em>One act</em> belongs to a person.</h1>
+      <p class="standfirst">ECOM is a registry served over the Model Context Protocol. Agents come and go; what persists is the record of what was observed, what was concluded, what was attempted, and what it cost.</p>
+      <div class="hero-meta">
+        <span>Registers<b>5</b></span>
+        <span>Tools<b><!--ecom:tools-->31<!--/ecom:tools--></b></span>
+        <span>Human acts<b>1</b></span>
+        <span>Store<b>SQLite</b></span>
+      </div>
+    </div>
+
+    <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="Mark of the five registers: estates, agents, tasks, signals and findings arranged around a central record.">
+      <circle class="ring draw" cx="100" cy="100" r="78"/>
+      <circle class="frame draw" cx="100" cy="100" r="72"/>
+      <g class="spoke fade">
+        <path d="M100 34 L163 80 L139 154 L61 154 L37 80 Z"/>
+        <path d="M100 34 L139 154 M100 34 L61 154 M163 80 L61 154 M163 80 L37 80 M139 154 L37 80"/>
+      </g>
+      <g class="node">
+        <circle cx="100" cy="34" r="5"/><circle cx="163" cy="80" r="5"/>
+        <circle cx="139" cy="154" r="5"/><circle cx="61" cy="154" r="5"/><circle cx="37" cy="80" r="5"/>
+      </g>
+      <circle class="core fade" cx="100" cy="100" r="3.4"/>
+      <g class="fade">
+        <text x="100" y="20">SIGNALS</text><text x="176" y="76">FINDINGS</text>
+        <text x="150" y="176">TASKS</text><text x="50" y="176">AGENTS</text><text x="24" y="76">ESTATES</text>
+        <text class="glyph" x="100" y="118">record</text>
+      </g>
+    </svg>
+  </div>
+</header>
+
+<section>
+  <div class="col">
+    <div class="rail">The claim</div>
+    <div>
+      <h2>No human workers. One human act.</h2>
+      <p class="lede">Nobody writes the code, runs the migration, reads the crash report or files the finding. Machines do the work. A person does exactly one thing, and the protocol names it: <em class="term">approve_plan</em>.</p>
+      <p>This is a boundary, not a boast. An agent may propose anything, attempt anything and record anything — but the gate that lets a plan run is a separate tool, and its own documentation forbids an agent from pulling it: <em>call it on a person's instruction, never on your own judgement</em>. Everything else is unattended.</p>
+      <p>What makes that survivable is bookkeeping, not cleverness. An agent has no memory between sessions; the registry has nothing but memory. Every design decision follows from that asymmetry — the record is the institution, and the agents are transient staff who consult it, add to it, and are forgotten.</p>
+      <div class="pull">
+        A finding with no evidence is an opinion — set confidence honestly low if you have none.
+        <small>From the protocol's own tool documentation</small>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">Where this is</div>
+    <div>
+      <h2>Five stages, scored honestly</h2>
+      <p class="lede">What is live is labelled live; what is not is labelled in rollout. Each stage says how it is measured, so the label can be checked rather than believed.</p>
+
+      <ol class="stages">
+        <li>
+          <div class="head"><span class="name">1 · The record</span> <span class="pill live">live</span></div>
+          <p>Five registers, <!--ecom:tools-word-->thirty-one<!--/ecom:tools-word--> tools, one SQLite file. <!--ecom:stage1-->Six holdings and two agents currently registered; eighteen tasks recorded with their full retry history.<!--/ecom:stage1--></p>
+          <p class="measure">Measured by: <b>system_status</b> — counts by state across every register, answered without arguments.</p>
+        </li>
+        <li>
+          <div class="head"><span class="name">2 · Signal ingestion</span> <span class="pill live">live</span></div>
+          <p><!--ecom:stage2-->Twenty-eight observations<!--/ecom:stage2--> recorded across release state, revenue, store reviews, cost, quality, capacity, deployment and workflow. Re-reading the same window corrects the row instead of adding a second one.</p>
+          <p class="measure">Measured by: <b>deduplication keys</b> — the same key written twice yields one row.</p>
+        </li>
+        <li>
+          <div class="head"><span class="name">3 · Findings and decisions</span> <span class="pill roll">in rollout</span></div>
+          <p><!--ecom:stage3-->Recording works: forty findings, ranked worst-first, several carrying the signal identifiers that support them. Deciding does not yet happen — the five most severe findings are all still <em>open</em>.<!--/ecom:stage3--> A record that only accumulates problems is half a system, and this page will keep saying so until decisions appear.</p>
+          <p class="measure">Measured by: <b>the ratio of decided to open findings</b>, printed in the excerpt table below.</p>
+        </li>
+        <li>
+          <div class="head"><span class="name">4 · Publication</span> <span class="pill roll">in rollout</span></div>
+          <p>This page is generated from the live registry by a deterministic exporter — no language model in the loop, so reading the record costs nothing and cannot embellish. A structural leak guard rejects e-mails, IP literals, tokens and non-allowlisted domains before anything is written.</p>
+          <p class="measure">Measured by: <b>the guard failing closed</b> — on any match nothing is written and nothing is pushed.</p>
+        </li>
+        <li>
+          <div class="head"><span class="name">5 · A second implementation</span> <span class="pill none">not started</span></div>
+          <p>The specification is the project; the server here is one implementation of it. Until somebody writes a second conformant registry, this is a codebase with a document attached rather than a protocol.</p>
+          <p class="measure">Measured by: <b>one registry that is not ours</b> passing the conformance list in the specification.</p>
+        </li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">Structure</div>
+    <div>
+      <h2>Five registers, thirty-one tools</h2>
+      <p class="lede">Every one is an MCP tool. There is no other way into the store — no REST side door, no direct SQL for agents.</p>
+
+      <div class="regs">
+        <div class="reg">
+          <h4>Estates</h4>
+          <p>What exists. Type, repository and branch, backend address, last known commit, and an append-only column of environment notes that no tool may overwrite.</p>
+          <div class="tools">list_projects · get_project · create_project · update_project · append_env_note · set_latest_commit</div>
+        </div>
+        <div class="reg">
+          <h4>Agents</h4>
+          <p>Who is at work. A name, a role, the model it runs on, capability tags, a state — idle, working, disabled — and a heartbeat, so a working agent can be told from a stalled one.</p>
+          <div class="tools">register_agent · list_agents · set_agent_status · heartbeat_agent</div>
+        </div>
+        <div class="reg">
+          <h4>Tasks</h4>
+          <p>What is being attempted. Work is assigned, planned, gated by a person, then run. Dependencies form a graph that refuses to close a cycle, and every attempt appends a result rather than replacing one.</p>
+          <div class="tools">assign_task · submit_plan · approve_plan · log_result · get_task · list_tasks · ready_tasks · add_task_dependency · remove_task_dependency · task_blockers</div>
+        </div>
+        <div class="reg">
+          <h4>Signals</h4>
+          <p>What was observed, unjudged. Crash rates, store verdicts, revenue lines, backend logs, manual notes — each with a deduplication key, so re-ingesting a week corrects the record instead of doubling it.</p>
+          <div class="tools">record_signal · list_signals · register_signal_source · list_signal_sources</div>
+        </div>
+        <div class="reg">
+          <h4>Findings</h4>
+          <p>What was concluded, and on whose evidence. A claim carries severity, confidence, a proposal and the identifiers of the signals beneath it. It closes only by a decision, and a rejection must state its reason.</p>
+          <div class="tools">create_finding · list_findings · get_finding · add_finding_evidence · decide_finding</div>
+        </div>
+        <div class="reg">
+          <h4>The estate itself</h4>
+          <p><em class="term">system_status</em> renders the whole holding in one call. <em class="term">create_backup</em> snapshots the database and pushes it to a git remote if one is configured; snapshots also run on a timer, unasked.</p>
+          <div class="tools">system_status · create_backup</div>
+        </div>
+      </div>
+
+      <h3>The chain</h3>
+      <p>The registers are not five separate stores. Something is <strong>measured</strong> and becomes a signal. A signal is <strong>read</strong> and becomes a finding, carrying that signal's identifier as evidence. A finding is <strong>decided</strong>, and an accepted one becomes a task. The task is <strong>planned</strong>, the plan is <strong>gated by a person</strong>, and the run appends a result that never erases the attempt before it.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">Rules</div>
+    <div>
+      <h2>Seven rules, enforced in the store</h2>
+      <p class="lede">Each is enforced at write time rather than described in a prompt. An agent that has read no prompt must still be unable to break them.</p>
+      <ol class="rules">
+        <li><b>Nothing enters twice.</b><span>Every signal carries a caller-supplied deduplication key. The same key written again updates the row, so re-ingestion is always safe and nothing is double-counted.</span></li>
+        <li><b>The record is added to, never overwritten.</b><span>Each result appends; each environment note is timestamped and left standing. A task that failed four times before succeeding keeps all five rows.</span></li>
+        <li><b>Nothing runs on an agent's own say-so.</b><span>A plan runs only after the human gate, and re-submitting a plan voids any approval it already held.</span></li>
+        <li><b>Work cannot wait upon itself.</b><span>A dependency that would close a cycle is rejected at write time, so the ready set is always computable.</span></li>
+        <li><b>A claim names its evidence.</b><span>Findings carry the identifiers of the signals beneath them. Severity — how much is being lost now — and confidence — how directly it was measured — are separate fields, never conflated.</span></li>
+        <li><b>A refusal is recorded as carefully as an approval.</b><span>Rejecting is a normal outcome, not a failure. Rejected and resolved both require a written reason.</span></li>
+        <li><b>No secret enters the record.</b><span>Environment notes and source configurations are plain text and documented as plain text. Addressing only. Credentials live in the process environment or nowhere.</span></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">The record</div>
+    <div>
+      <h2>Excerpts, filtered for publication</h2>
+      <p class="lede">Drawn from a live estate. Names, hosts, addresses, repositories and identifiers are struck out at source. Counts, severities, states and measured values are unaltered.</p>
+
+      <h3>Roster</h3>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Agent</th><th>Role</th><th>Model class</th><th>Capabilities</th><th>State</th></tr></thead>
+          <tbody><!--ecom:roster-->
+            <tr><td class="k">agent-01</td><td>engineer</td><td>frontier, reasoning</td><td>infra · devops · backend · security · debug · mcp</td><td><span class="pill wait">idle</span></td></tr>
+            <tr><td class="k">agent-02</td><td>content strategist</td><td>mid-tier, fast</td><td>script · hook · caption</td><td><span class="pill wait">idle</span></td></tr>
+          <!--/ecom:roster--></tbody>
+        </table>
+        <caption>Two agents hold an estate of six. Both idle at the moment of reading — the roster records capability, not activity.</caption>
+      </div>
+
+      <h3>Findings, worst first</h3>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Sev</th><th>Conf</th><th>Kind</th><th>Claim, redacted</th><th>Status</th></tr></thead>
+          <tbody><!--ecom:findings-->
+            <tr><td class="k"><span class="sev-bar">●●●●●</span></td><td>5</td><td>technical</td><td>Deployment documents in the repository describe an architecture that does not exist on the host; following them would take the live estate down</td><td><span class="pill sev">open</span></td></tr>
+            <tr><td class="k"><span class="sev-bar">●●●●●</span></td><td>5</td><td>product</td><td>Published legal pages were another company's template, naming a company and domain unrelated to the holding <span class="red">██████</span> times</td><td><span class="pill sev">open</span></td></tr>
+            <tr><td class="k"><span class="sev-bar">●●●●●</span></td><td>5</td><td>product</td><td>Store state reads <strong>rejected</strong>; the reason was recorded nowhere, so nobody was tracking it</td><td><span class="pill sev">open</span></td></tr>
+            <tr><td class="k"><span class="sev-bar">●●●●●</span></td><td>5</td><td>product</td><td>The pipeline's single human intervention point is unreachable from the client: work is produced, reaches approval, and stops</td><td><span class="pill sev">open</span></td></tr>
+            <tr><td class="k"><span class="sev-bar">●●●●</span>○</td><td>5</td><td>technical</td><td>Password and root sign-in left enabled on an internet-facing host after a back door was removed; deferred by explicit owner decision, recorded as deferred</td><td><span class="pill sev">open</span></td></tr>
+          <!--/ecom:findings--></tbody>
+        </table>
+        <caption>Five of forty. Every row is open — <strong>nothing has been decided yet</strong>, which is exactly what stage 3 above admits. The third row is the argument for the apparatus: a rejected release, tracked by nobody, surfaced on the first pass of the signal register and appeared in no note anywhere.</caption>
+      </div>
+
+      <h3>Signals beneath them</h3>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Kind</th><th>Metric</th><th>Value</th><th>Note, redacted</th></tr></thead>
+          <tbody><!--ecom:signals-->
+            <tr><td class="k">release</td><td>store_state</td><td>REJECTED</td><td>holding <span class="red">████</span>, version <span class="red">█████</span></td></tr>
+            <tr><td class="k">revenue</td><td>mrr</td><td>3</td><td>28-day window, one active subscription</td></tr>
+            <tr><td class="k">revenue</td><td>active_users</td><td>32 → 35</td><td>two readings three days apart, same deduplication scheme</td></tr>
+            <tr><td class="k">cost</td><td>usd_per_job</td><td>0.394</td><td>measured across two runs; largest line is image prompting at 0.216</td></tr>
+            <tr><td class="k">quality</td><td>duration_drift</td><td>12.52 s</td><td>46% — the quality check audited the <em>estimated</em> duration, never the real one</td></tr>
+            <tr><td class="k">capacity</td><td>disk_used_pct</td><td>9</td><td>16–19 MB per job; headroom for roughly 5,000 jobs</td></tr>
+            <tr><td class="k">cost</td><td>prefix_tokens</td><td>483</td><td>29 short of the cache minimum; the provider declines to cache and returns no error</td></tr>
+            <tr><td class="k">store_review</td><td>rating</td><td>5</td><td>reviewer and body withheld</td></tr>
+          <!--/ecom:signals--></tbody>
+        </table>
+        <caption>Observations, not judgements. The last three are the ones a person would never have found: a silent cache miss costing money per call, a quality gate measuring the wrong number, and disk headroom stated as a job count rather than a percentage.</caption>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">Build log</div>
+    <div>
+      <h2>One entry a week</h2>
+      <p class="lede">Every line carries a registry reference — a task or finding identifier that exists in the record — so nothing here can be embellished after the fact. Weeks with no visible change say so.</p>
+
+      <div class="log">
+        <div class="entry">
+          <div class="entry-head"><span class="wk">Week 32</span> <span class="dates">3 – 9 Aug 2026</span></div>
+          <h5>Shipped</h5>
+          <ul>
+            <li>First full pass of the signal register against live sources: 28 observations across eight kinds, deduplicated at write time. <span class="ref">[signals 2–28]</span></li>
+            <li>Publication path built: deterministic exporter, structural leak guard, this page. No model in the loop. <span class="ref">[stage 4, in rollout]</span></li>
+          </ul>
+          <h5>Learned</h5>
+          <ul>
+            <li>The registry surfaced a rejected app-store release that appeared in no note, no document and no person's memory. The finding was raised on the first ingestion pass, not by anyone noticing. <span class="ref">[finding 10 · signal 18]</span></li>
+            <li>An owner decision to defer a security hardening step was recorded <em>as deferred</em> rather than left implicit — which is the only reason it is still visible a week later. <span class="ref">[finding 40 · 5 Aug]</span></li>
+          </ul>
+          <h5>Still human</h5>
+          <ul><li>Every finding decision. Forty recorded, none decided.</li></ul>
+        </div>
+
+        <div class="entry">
+          <div class="entry-head"><span class="wk">Week 31</span> <span class="dates">27 Jul – 2 Aug 2026</span></div>
+          <h5>Shipped</h5>
+          <ul>
+            <li>Registry raised and the estate registered: six holdings, two agents, the first task recorded the same day. <span class="ref">[task 1 · 28 Jul]</span></li>
+            <li>Schema migrations installed <em>before</em> the production line was built, closing a silent drift where new columns were never added to existing tables. <span class="ref">[task 8]</span></li>
+            <li>Nine-stage production line: stage table, task chain, jobs endpoint; every stage individually traceable. <span class="ref">[task 10]</span></li>
+            <li>Bearer token removed from the query string of 22 endpoints, where it had been travelling through a third party's logs. <span class="ref">[task 12]</span></li>
+          </ul>
+          <h5>Learned</h5>
+          <ul>
+            <li>A reverse proxy had cached an upstream address at start-up; every rebuild returned 502 until the proxy itself was recreated. Recorded with both the workaround and the permanent fix, because the workaround is what gets used at 2am. <span class="ref">[task 6]</span></li>
+            <li>Two surfaces describing the same fact drift apart unless the fact lives in one place — see the corrections below.</li>
+          </ul>
+          <h5>Still human</h5>
+          <ul><li>Credential rotation. Left <strong>pending</strong> rather than closed, with its ordering constraint written into the record: rotating the token severs the agent's connection to the registry, so it must be the last act of a session. <span class="ref">[task 7]</span></li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">Corrections</div>
+    <div>
+      <h2>Nothing here is quietly deleted</h2>
+      <p class="lede">When a public claim on this page turns out to be wrong, the correction is logged rather than edited away.</p>
+      <ul class="corr">
+        <li>
+          <time datetime="2026-08-07">7 Aug 2026</time>
+          <p><b>Tool count was wrong.</b> This page said thirty-nine tools; the registry exposes thirty-one. The figure had been written by hand. It is now derived from the tool list itself, so the two cannot drift apart again.</p>
+        </li>
+        <li>
+          <time datetime="2026-08-01">1 Aug 2026</time>
+          <p><b>Published legal pages belonged to someone else.</b> A holding's privacy and terms pages were another company's template, naming that company and its domain throughout, alongside a personal e-mail address. Removed, and recorded as an open finding rather than a silent fix — the replacement text is still a placeholder.</p>
+        </li>
+        <li>
+          <time datetime="2026-07-31">31 Jul 2026</time>
+          <p><b>Repository deployment instructions described a server that does not exist.</b> Rather than delete them, the mismatch was written up as a severity-5 finding with the measured reality beside it, because the next agent to read them would otherwise have followed them.</p>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">Running it</div>
+    <div>
+      <h2>Self-hosting</h2>
+      <p class="lede">An HTTP MCP server holding a single SQLite file. There is no cloud, no account and no operator. You run it, or it does not exist.</p>
+
+      <h3>1 · Raise the server</h3>
+<pre><span class="c"># the registry keeps one file; everything else is disposable</span>
+ECOM_DB_PATH=/var/lib/ecom/registry.sqlite
+ECOM_API_TOKEN=<span class="s">&lt;64 hex characters you generate&gt;</span>
+ECOM_BACKUP_REMOTE=<span class="s">&lt;optional git remote for snapshots&gt;</span></pre>
+
+      <h3>2 · Declare it once</h3>
+<pre>{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"ecom"</span>: {
+      <span class="s">"type"</span>: <span class="s">"http"</span>,
+      <span class="s">"url"</span>: <span class="s">"https://&lt;your-host&gt;/ecom/mcp/"</span>,
+      <span class="s">"headers"</span>: { <span class="s">"Authorization"</span>: <span class="s">"Bearer &lt;your token&gt;"</span> }
+    }
+  }
+}</pre>
+      <p>One token, one estate. Whoever holds it can write to the whole record — so rotate it deliberately, and mind the ordering: change it on the server first, restart, then change it in the client.</p>
+
+      <h3>3 · Open the record</h3>
+<pre><span class="c"># the customary first four calls</span>
+system_status
+create_project   name=<span class="s">"…"</span> type=<span class="s">"mobile_app|web_app|website|internal_tool|ai_factory"</span>
+register_agent   name=<span class="s">"…"</span> role=<span class="s">"…"</span> model=<span class="s">"…"</span> capabilities=[…]
+register_signal_source project=<span class="s">"…"</span> kind=<span class="s">"crashlytics|analytics|store_reviews|backend_logs|manual"</span></pre>
+      <p>Then instruct your agents to consult the record at the start of a session and add to it at the end. That instruction is the entire operating discipline; there is no other configuration.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <div class="rail">Scope</div>
+    <div>
+      <h2>What it gives, and what it will not</h2>
+      <div class="two">
+        <div>
+          <h3>What you get</h3>
+          <ul>
+            <li>A memory that outlives the session, the model and the agent.</li>
+            <li>Findings ranked by what is being lost now, not by who raised them.</li>
+            <li>Re-readable sources: the same week ingested twice corrects itself.</li>
+            <li>A full retry history for every attempt, including the failures.</li>
+            <li>A dependency graph that answers <em>what may start now</em>.</li>
+            <li>Decisions with reasons attached, so settled arguments stay settled.</li>
+            <li>One file you can copy, snapshot and read with any tool that speaks SQL.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What it is not</h3>
+          <ul>
+            <li>Not a scheduler. It records work; it does not run it.</li>
+            <li>Not a secret store. Everything written is plain text, by design.</li>
+            <li>Not multi-tenant. One token, one estate, no roles.</li>
+            <li>Not a substitute for the human gate. The gate is the product.</li>
+            <li>Not a metrics platform. It holds the observations you chose to keep.</li>
+            <li>Not a service. Nobody hosts this for you.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="sub">
+        <h3 style="margin-top:0">The build log by e-mail</h3>
+        <p class="note" style="margin-bottom:.2rem">One message a week, the same entry that appears above. No other use, no other sender.</p>
+        <p role="status" id="sub-status"></p>
+        <form id="sub-form" method="post" action="/api/newsletter">
+          <label class="hp" for="sub-company">Company (leave blank)</label>
+          <input class="hp" type="text" id="sub-company" name="company" tabindex="-1" autocomplete="off">
+          <label class="hp" for="sub-email">E-mail address</label>
+          <input type="email" id="sub-email" name="email" placeholder="you@example.com" required autocomplete="email">
+          <button type="submit">Subscribe</button>
+        </form>
+        <p class="note">Stored as an address and a timestamp, in the same SQLite file as everything else. Reply to any message to be removed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="rule"></div>
+  <p><b>ECOM</b> — an open registry protocol for unattended software estates. Published anonymously and unaffiliated with any company, product or person. No entity is named here, and none is implied.</p>
+  <p>All records shown are excerpts from a live installation, filtered for publication. Hosts, repositories, addresses, identifiers, reviewer names and message bodies are struck out at source. Counts, severities, states and measured values are unaltered.</p>
+  <p>Architecture and schema: the author. Implementation: the agents described above. Reproduce, fork and self-host freely. MIT.</p>
+  <p><!--ecom:generated-->Rendered by hand — the deterministic exporter has not run against this copy.<!--/ecom:generated--></p>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('sub-form');
+  var status = document.getElementById('sub-status');
+  if (!form) return;
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (form.company.value) return;               // honeypot: silently ignore
+    var button = form.querySelector('button');
+    button.disabled = true;
+    status.textContent = 'Sending…';
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email.value })
+    }).then(function (response) {
+      if (!response.ok) throw new Error(String(response.status));
+      form.style.display = 'none';
+      status.textContent = 'Subscribed. One message a week.';
+    }).catch(function () {
+      button.disabled = false;
+      status.textContent = 'That did not go through — try again in a moment.';
+    });
+  });
+})();
+</script>

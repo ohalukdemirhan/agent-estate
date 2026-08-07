@@ -1,0 +1,46 @@
+name: leak guard
+
+# The published page and the repository must both survive the structural
+# guard. This runs on every push so a leak fails the build rather than
+# reaching a reader.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Scan tracked files for structural identifiers
+        run: |
+          python3 - <<'PY'
+          import sys, pathlib
+          sys.path.insert(0, "tools")
+          import redact
+
+          SKIP_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf"}
+          failed = False
+
+          for path in pathlib.Path(".").rglob("*"):
+              if not path.is_file() or ".git/" in str(path):
+                  continue
+              if path.suffix.lower() in SKIP_SUFFIXES:
+                  continue
+              try:
+                  text = path.read_text()
+              except (UnicodeDecodeError, OSError):
+                  continue
+              leaks = redact.scan(text)
+              if leaks:
+                  failed = True
+                  print(f"\n{path}")
+                  for leak in leaks[:10]:
+                      print(f"  {leak}")
+
+          sys.exit(1 if failed else 0)
+          PY

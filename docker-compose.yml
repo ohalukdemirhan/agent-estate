@@ -1,0 +1,16 @@
+services:
+  registry:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/var/lib/ecom
+    ports:
+      # Bound to loopback: put a TLS-terminating reverse proxy in front.
+      # Exposing this directly publishes a single-token database.
+      - "127.0.0.1:8787:8787"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8787/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

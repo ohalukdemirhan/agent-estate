@@ -1,0 +1,20 @@
+# Never commit anything below. The publisher refuses to run if these appear.
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.db
+*.pem
+*.key
+id_*
+!id_*.example
+denylist.txt
+secrets/
+snapshots/
+projection.json
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
