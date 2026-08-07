@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Render the public page from a live registry, then push it.
 
-Runs without a language model. It reads SQLite, applies the projection in
-redact.py, substitutes values between markers in site/template.html, refuses
-to write anything that trips the leak guard, and commits only when the
-rendered bytes actually changed.
+Runs without a language model. It reads the registry, applies the projection
+in redact.py, substitutes values between markers in site/template.html,
+refuses to write anything that trips the leak guard, and commits only when
+the rendered bytes actually changed.
 
     python3 tools/publish.py --db /var/lib/ecom/registry.sqlite
-    python3 tools/publish.py --db … --push
-    python3 tools/publish.py --db … --check           # diff only, no writes
-    python3 tools/publish.py --db … --denylist /etc/agent-estate/denylist.txt
+    tools/dump_registry.sh > /tmp/dump.json && python3 tools/publish.py --json /tmp/dump.json
+    python3 tools/publish.py --json … --push
+    python3 tools/publish.py --json … --check         # diff only, no writes
+    python3 tools/publish.py --json … --denylist /etc/agent-estate/denylist.txt
 
 An LLM is optional and off by default (--engine claude). It may rewrite prose
 sections only; it never decides what is publishable — the projection and the
@@ -79,7 +80,43 @@ def escape(text: str) -> str:
 # Reading the registry
 # --------------------------------------------------------------------------
 
-def read_registry(db_path: Path) -> dict:
+def _shape(projects, agents, tasks, findings, signals) -> dict:
+    """Common shape, whatever store the rows came from.
+
+    Every list is sorted here rather than in the query. Two stores that
+    return the same rows in a different order would otherwise render two
+    different pages, and a publisher on a timer would commit the difference
+    every quarter of an hour.
+    """
+    def newest(rows: list[dict], field: str) -> list[dict]:
+        return sorted(
+            rows,
+            key=lambda r: (str(r.get(field) or ""), int(r.get("id") or 0)),
+            reverse=True,
+        )
+
+    tasks = newest(tasks, "created_at")
+    findings = newest(findings, "created_at")
+    signals = newest(signals, "observed_at")
+
+    return {
+        "projects": [p for p in projects if (p.get("status") or "active") == "active"],
+        "agents": agents,
+        "tasks": tasks,
+        "all_findings": findings,
+        "findings": sorted(
+            findings,
+            key=lambda f: (int(f.get("severity") or 0), int(f.get("confidence") or 0)),
+            reverse=True,
+        )[:5],
+        "finding_count": len(findings),
+        "open_findings": sum(1 for f in findings if f.get("status") == "open"),
+        "signals": signals[:12],
+        "signal_count": len(signals),
+    }
+
+
+def read_sqlite(db_path: Path) -> dict:
     if not db_path.exists():
         sys.exit(f"publish: no database at {db_path}")
 
@@ -103,26 +140,41 @@ def read_registry(db_path: Path) -> dict:
                         item[field] = []
         return items
 
-    data = {
-        "projects": rows("SELECT * FROM projects WHERE status = 'active'"),
-        "agents": decode(rows("SELECT * FROM agents ORDER BY id"), "capabilities"),
-        "tasks": rows("SELECT id, title, status, created_at FROM tasks "
-                      "ORDER BY created_at DESC"),
-        "all_findings": rows("SELECT id, title, severity, status, created_at "
-                             "FROM findings ORDER BY created_at DESC"),
-        "signals": rows("SELECT * FROM signals ORDER BY observed_at DESC LIMIT 12"),
-        "signal_count": rows("SELECT COUNT(*) AS n FROM signals")[0]["n"],
-        "findings": decode(
-            rows("SELECT * FROM findings ORDER BY severity DESC, confidence DESC LIMIT 5"),
-            "evidence_signal_ids",
-        ),
-        "finding_count": rows("SELECT COUNT(*) AS n FROM findings")[0]["n"],
-        "open_findings": rows(
-            "SELECT COUNT(*) AS n FROM findings WHERE status = 'open'"
-        )[0]["n"],
-    }
+    data = _shape(
+        rows("SELECT * FROM projects"),
+        decode(rows("SELECT * FROM agents ORDER BY id"), "capabilities"),
+        rows("SELECT id, title, status, created_at FROM tasks ORDER BY created_at DESC"),
+        decode(rows("SELECT * FROM findings"), "evidence_signal_ids"),
+        rows("SELECT * FROM signals ORDER BY observed_at DESC"),
+    )
     connection.close()
     return data
+
+
+def read_json(path: Path) -> dict:
+    """Read a dump produced by tools/dump_registry.sh.
+
+    The registry may live in Postgres, SQLite, or anything else a conformant
+    implementation chooses. Rather than teach the publisher every store — and
+    take on a driver dependency for each — it accepts a plain JSON dump. The
+    dump script is twenty lines and store-specific; this file stays stdlib.
+    """
+    if not path.exists():
+        sys.exit(f"publish: no dump at {path}")
+    try:
+        payload = json.loads(path.read_text())
+    except ValueError as error:
+        sys.exit(f"publish: {path} is not valid JSON — {error}")
+
+    missing = [k for k in ("projects", "agents", "tasks", "findings", "signals")
+               if k not in payload]
+    if missing:
+        sys.exit(f"publish: dump is missing {', '.join(missing)}")
+
+    return _shape(
+        payload["projects"], payload["agents"], payload["tasks"],
+        payload["findings"], payload["signals"],
+    )
 
 
 # --------------------------------------------------------------------------
@@ -417,7 +469,10 @@ def commit_and_push(out_path: Path, key: Path | None) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", required=True, type=Path)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--db", type=Path, help="SQLite registry file")
+    source.add_argument("--json", type=Path, dest="json_dump",
+                        help="dump from tools/dump_registry.sh (Postgres etc.)")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--denylist", type=Path,
                         help="estate-specific strings, kept outside the repo")
@@ -439,7 +494,7 @@ def main() -> None:
         print("publish: no --denylist given; structural patterns only",
               file=sys.stderr)
 
-    data = read_registry(args.db)
+    data = read_sqlite(args.db) if args.db else read_json(args.json_dump)
     values = build_projection(data, args.salt, denylist)
 
     if args.engine == "claude":
