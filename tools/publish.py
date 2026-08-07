@@ -52,18 +52,20 @@ TOOLS = [
     "system_status", "create_backup",
 ]
 
-NUMBER_WORDS = {
-    1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
-    7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
-    12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
-    16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
-    20: "twenty", 28: "twenty-eight", 30: "thirty", 31: "thirty-one",
-    40: "forty",
-}
+_ONES = ("zero one two three four five six seven eight nine ten eleven twelve "
+         "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
+_TENS = ("", "", "twenty", "thirty", "forty", "fifty",
+         "sixty", "seventy", "eighty", "ninety")
 
 
 def spell(n: int) -> str:
-    return NUMBER_WORDS.get(n, str(n))
+    """Numbers read as words on this page; past ninety-nine, as digits."""
+    if n < 20:
+        return _ONES[n]
+    if n < 100:
+        tens, ones = divmod(n, 10)
+        return _TENS[tens] + (f"-{_ONES[ones]}" if ones else "")
+    return f"{n:,}"
 
 
 def count(n: int, singular: str, plural: str | None = None) -> str:
