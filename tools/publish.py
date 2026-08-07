@@ -501,9 +501,20 @@ def git(*args: str, key: Path | None = None) -> subprocess.CompletedProcess:
 
 
 def commit_and_push(out_path: Path, key: Path | None) -> None:
+    # --out may be given relative to the caller's working directory, which is
+    # not necessarily the repository root; resolve before asking git.
+    resolved = out_path.resolve()
+    try:
+        tracked = resolved.relative_to(ROOT)
+    except ValueError:
+        sys.exit(
+            f"publish: --push needs --out inside the repository, but "
+            f"{resolved} is outside {ROOT}"
+        )
+
     git("config", "user.name", "agent-estate")
     git("config", "user.email", "agent-estate@users.noreply.github.com")
-    git("add", str(out_path.relative_to(ROOT)))
+    git("add", str(tracked))
     staged = git("diff", "--cached", "--quiet")
     if staged.returncode == 0:
         print("publish: nothing staged")
