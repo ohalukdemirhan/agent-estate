@@ -20,6 +20,7 @@ guard run after it, on its output.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sqlite3
@@ -197,10 +198,12 @@ def render_roster(agents: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def render_findings(findings: list[dict], salt: str, denylist: list[str]) -> str:
+def render_findings(findings, salt, denylist, cache=None) -> str:
     lines = []
     for finding in findings:
         row = redact.project_finding(finding, salt, denylist)
+        if cache:
+            row["title"] = cache.publishable(row["title"])
         severity = row["severity"]
         bar = "●" * severity + "○" * (5 - severity)
         pill = "sev" if row["status"] == "open" else "ok"
@@ -214,7 +217,7 @@ def render_findings(findings: list[dict], salt: str, denylist: list[str]) -> str
     return "\n".join(lines)
 
 
-def render_signals(signals: list[dict], salt: str, denylist: list[str]) -> str:
+def render_signals(signals, salt, denylist, cache=None) -> str:
     lines = []
     for signal in signals:
         row = redact.project_signal(signal, salt, denylist)
@@ -250,7 +253,7 @@ def _week_dates(year: int, week: int) -> str:
     return f"{monday.day} {monday:%b} – {sunday.day} {sunday:%b %Y}"
 
 
-def render_buildlog(data: dict, denylist: list[str], weeks: int = 3) -> str:
+def render_buildlog(data: dict, denylist: list[str], weeks: int = 3, cache=None) -> str:
     """Weekly entries derived from the record, not written by hand.
 
     Shipped  — tasks that succeeded that week.
@@ -269,6 +272,8 @@ def render_buildlog(data: dict, denylist: list[str], weeks: int = 3) -> str:
         key = _week_of(task.get("created_at"))
         if key and task.get("status") == "succeeded":
             title = redact.redact_text(task.get("title") or "untitled", denylist)
+            if cache:
+                title = cache.publishable(title)
             bucket(key)["shipped"].append(
                 f"{escape(title)} <span class=\"ref\">[task {task['id']}]</span>"
             )
@@ -277,6 +282,8 @@ def render_buildlog(data: dict, denylist: list[str], weeks: int = 3) -> str:
         key = _week_of(finding.get("created_at"))
         if key:
             title = redact.redact_text(finding.get("title") or "untitled", denylist)
+            if cache:
+                title = cache.publishable(title)
             severity = int(finding.get("severity") or 0)
             bucket(key)["learned"].append(
                 f"{escape(title)} <span class=\"ref\">[finding {finding['id']} · "
@@ -313,6 +320,8 @@ def render_buildlog(data: dict, denylist: list[str], weeks: int = 3) -> str:
             if pending:
                 for task in pending[:3]:
                     title = redact.redact_text(task.get("title") or "untitled", denylist)
+                    if cache:
+                        title = cache.publishable(title)
                     parts.append(
                         f'    <li>{escape(title)} — left <strong>pending</strong> '
                         f'rather than closed. <span class="ref">[task {task["id"]}]</span></li>'
@@ -432,6 +441,48 @@ def rewrite_prose(text: str, instruction: str) -> str:
     ).strip()
 
 
+class TranslationCache:
+    """Restate one agent-written line in publishable English, once ever.
+
+    Keyed by a hash of the line, so a finding raised in July is translated on
+    the first publish and read from disk on every publish after it. A timer
+    running every quarter of an hour must not spend a token per run — and a
+    line that has already been reviewed should not silently change wording
+    underneath a reader.
+    """
+
+    def __init__(self, path: Path | None):
+        self.path = path or (ROOT / ".cache" / "publishable.json")
+        self.entries: dict[str, str] = {}
+        self.dirty = False
+        if self.path.exists():
+            try:
+                self.entries = json.loads(self.path.read_text())
+            except ValueError:
+                self.entries = {}
+
+    def publishable(self, text: str) -> str:
+        key = hashlib.sha256(text.encode()).hexdigest()[:16]
+        if key not in self.entries:
+            self.entries[key] = rewrite_prose(
+                text,
+                "Restate this one-line engineering note as a single plain "
+                "English sentence for a public page. Keep the technical "
+                "substance and any number. Remove product names, screen "
+                "names, file names, internal identifiers and anything that "
+                "would identify the company or its apps — describe the kind "
+                "of thing instead. Do not add detail that is not there.",
+            )
+            self.dirty = True
+        return self.entries[key]
+
+    def save(self) -> None:
+        if not self.dirty:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.entries, indent=1, sort_keys=True))
+
+
 # --------------------------------------------------------------------------
 # Git
 # --------------------------------------------------------------------------
@@ -482,7 +533,10 @@ def main() -> None:
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--check", action="store_true",
                         help="report whether output would change; write nothing")
-    parser.add_argument("--engine", choices=["none", "claude"], default="none")
+    parser.add_argument("--engine", choices=["none", "claude"], default="none",
+                        help="regenerate free-text blocks; needs ANTHROPIC_API_KEY")
+    parser.add_argument("--cache", type=Path,
+                        help="where restated lines are kept between runs")
     args = parser.parse_args()
 
     denylist: list[str] = []
@@ -497,11 +551,27 @@ def main() -> None:
     data = read_sqlite(args.db) if args.db else read_json(args.json_dump)
     values = build_projection(data, args.salt, denylist)
 
-    if args.engine == "claude":
-        values["stage3"] = rewrite_prose(
-            values["stage3"],
-            "Rewrite as one or two plain sentences. Keep every number.",
-        )
+    # Counts, stages and the roster are derived from structured columns and
+    # are always safe to publish. The build log and the two excerpt tables
+    # render free text written by agents — in whatever language and with
+    # whatever product vocabulary the estate happens to use. A denylist
+    # cannot anticipate an internal screen name, so those blocks are only
+    # regenerated when a model is available to restate them in publishable
+    # form. Otherwise the template's reviewed copy is left standing.
+    FREE_TEXT = ("buildlog", "findings", "signals")
+    if args.engine == "none":
+        for key in FREE_TEXT:
+            values.pop(key)
+        print("publish: free-text blocks left as reviewed copy "
+              "(pass --engine claude to regenerate them)", file=sys.stderr)
+    else:
+        cache = TranslationCache(args.cache)
+        values["findings"] = render_findings(
+            data["findings"], args.salt, denylist, cache)
+        values["signals"] = render_signals(
+            data["signals"], args.salt, denylist, cache)
+        values["buildlog"] = render_buildlog(data, denylist, cache=cache)
+        cache.save()
 
     body = substitute(TEMPLATE.read_text(), values)
     page = wrap(body)
