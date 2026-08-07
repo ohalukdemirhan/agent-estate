@@ -106,7 +106,10 @@ def read_registry(db_path: Path) -> dict:
     data = {
         "projects": rows("SELECT * FROM projects WHERE status = 'active'"),
         "agents": decode(rows("SELECT * FROM agents ORDER BY id"), "capabilities"),
-        "tasks": rows("SELECT id, status FROM tasks"),
+        "tasks": rows("SELECT id, title, status, created_at FROM tasks "
+                      "ORDER BY created_at DESC"),
+        "all_findings": rows("SELECT id, title, severity, status, created_at "
+                             "FROM findings ORDER BY created_at DESC"),
         "signals": rows("SELECT * FROM signals ORDER BY observed_at DESC LIMIT 12"),
         "signal_count": rows("SELECT COUNT(*) AS n FROM signals")[0]["n"],
         "findings": decode(
@@ -172,6 +175,109 @@ def render_signals(signals: list[dict], salt: str, denylist: list[str]) -> str:
     return "\n".join(lines)
 
 
+def _week_of(stamp: str | None) -> tuple[int, int] | None:
+    """ISO (year, week) for a timestamp, or None if it cannot be read."""
+    if not stamp:
+        return None
+    text = str(stamp).replace("Z", "+00:00")
+    for parse in (datetime.fromisoformat, lambda s: datetime.strptime(s[:10], "%Y-%m-%d")):
+        try:
+            moment = parse(text)
+        except (ValueError, TypeError):
+            continue
+        iso = moment.isocalendar()
+        return iso[0], iso[1]
+    return None
+
+
+def _week_dates(year: int, week: int) -> str:
+    monday = datetime.fromisocalendar(year, week, 1)
+    sunday = datetime.fromisocalendar(year, week, 7)
+    if monday.month == sunday.month:
+        return f"{monday.day} – {sunday.day} {sunday:%b %Y}"
+    return f"{monday.day} {monday:%b} – {sunday.day} {sunday:%b %Y}"
+
+
+def render_buildlog(data: dict, denylist: list[str], weeks: int = 3) -> str:
+    """Weekly entries derived from the record, not written by hand.
+
+    Shipped  — tasks that succeeded that week.
+    Learned  — findings raised that week, worst first.
+    Still human — tasks still pending, whenever they were assigned.
+
+    Every line carries the identifier it came from, so a reader can ask the
+    registry for the row rather than take the page's word for it.
+    """
+    buckets: dict[tuple[int, int], dict[str, list[str]]] = {}
+
+    def bucket(key: tuple[int, int]) -> dict[str, list[str]]:
+        return buckets.setdefault(key, {"shipped": [], "learned": []})
+
+    for task in data["tasks"]:
+        key = _week_of(task.get("created_at"))
+        if key and task.get("status") == "succeeded":
+            title = redact.redact_text(task.get("title") or "untitled", denylist)
+            bucket(key)["shipped"].append(
+                f"{escape(title)} <span class=\"ref\">[task {task['id']}]</span>"
+            )
+
+    for finding in data["all_findings"]:
+        key = _week_of(finding.get("created_at"))
+        if key:
+            title = redact.redact_text(finding.get("title") or "untitled", denylist)
+            severity = int(finding.get("severity") or 0)
+            bucket(key)["learned"].append(
+                f"{escape(title)} <span class=\"ref\">[finding {finding['id']} · "
+                f"severity {severity}]</span>"
+            )
+
+    pending = [t for t in data["tasks"] if t.get("status") == "pending"]
+
+    entries: list[str] = []
+    for index, key in enumerate(sorted(buckets, reverse=True)[:weeks]):
+        year, week = key
+        content = buckets[key]
+        parts = [
+            '<div class="entry">',
+            f'  <div class="entry-head"><span class="wk">Week {week}</span> '
+            f'<span class="dates">{_week_dates(year, week)}</span></div>',
+        ]
+
+        if content["shipped"]:
+            parts.append("  <h5>Shipped</h5>\n  <ul>")
+            parts += [f"    <li>{line}</li>" for line in content["shipped"][:6]]
+            parts.append("  </ul>")
+        if content["learned"]:
+            parts.append("  <h5>Learned</h5>\n  <ul>")
+            parts += [f"    <li>{line}</li>" for line in content["learned"][:6]]
+            parts.append("  </ul>")
+        if not content["shipped"] and not content["learned"]:
+            parts.append("  <p>No customer-visible change this week.</p>")
+
+        # Only the newest entry states what is still human — repeating it on
+        # every week would imply it was re-decided each time.
+        if index == 0:
+            parts.append("  <h5>Still human</h5>\n  <ul>")
+            if pending:
+                for task in pending[:3]:
+                    title = redact.redact_text(task.get("title") or "untitled", denylist)
+                    parts.append(
+                        f'    <li>{escape(title)} — left <strong>pending</strong> '
+                        f'rather than closed. <span class="ref">[task {task["id"]}]</span></li>'
+                    )
+            else:
+                parts.append("    <li>Every finding decision. None has been recorded.</li>")
+            parts.append("  </ul>")
+
+        parts.append("</div>")
+        entries.append("\n".join(parts))
+
+    if not entries:
+        return ('<div class="entry"><p>No entries yet — the registry holds no '
+                "dated work.</p></div>")
+    return "\n".join(entries)
+
+
 def build_projection(data: dict, salt: str, denylist: list[str]) -> dict:
     projects = len(data["projects"])
     agents = len(data["agents"])
@@ -203,6 +309,7 @@ def build_projection(data: dict, salt: str, denylist: list[str]) -> dict:
         ),
         "stage2": count(signals, "observation").capitalize(),
         "stage3": stage3,
+        "buildlog": render_buildlog(data, denylist),
         "roster": render_roster(data["agents"]),
         "findings": render_findings(data["findings"], salt, denylist),
         "signals": render_signals(data["signals"], salt, denylist),

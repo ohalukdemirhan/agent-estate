@@ -393,9 +393,9 @@ footer b{color:var(--fg-soft);font-weight:400}
     <div class="rail">Build log</div>
     <div>
       <h2>One entry a week</h2>
-      <p class="lede">Every line carries a registry reference — a task or finding identifier that exists in the record — so nothing here can be embellished after the fact. Weeks with no visible change say so.</p>
+      <p class="lede">Generated from the record, not written up afterwards: shipped lines are tasks that succeeded that week, learned lines are findings raised that week, and each carries the identifier you can ask the registry for. Weeks with no visible change say so.</p>
 
-      <div class="log">
+      <div class="log"><!--ecom:buildlog-->
         <div class="entry">
           <div class="entry-head"><span class="wk">Week 32</span> <span class="dates">3 – 9 Aug 2026</span></div>
           <h5>Shipped</h5>
@@ -429,7 +429,7 @@ footer b{color:var(--fg-soft);font-weight:400}
           <h5>Still human</h5>
           <ul><li>Credential rotation. Left <strong>pending</strong> rather than closed, with its ordering constraint written into the record: rotating the token severs the agent's connection to the registry, so it must be the last act of a session. <span class="ref">[task 7]</span></li></ul>
         </div>
-      </div>
+      <!--/ecom:buildlog--></div>
     </div>
   </div>
 </section>
@@ -441,6 +441,14 @@ footer b{color:var(--fg-soft);font-weight:400}
       <h2>Nothing here is quietly deleted</h2>
       <p class="lede">When a public claim on this page turns out to be wrong, the correction is logged rather than edited away.</p>
       <ul class="corr">
+        <li>
+          <time datetime="2026-08-07">7 Aug 2026</time>
+          <p><b>Sign-up was pointed at the wrong database.</b> This page said subscriber addresses were kept "in the same SQLite file as everything else" — and they were. That file is snapshotted and pushed to a git remote by <em class="term">create_backup</em>, so every backup would have carried the list, permanently. Addresses now live in a separate file that no backup and no agent touches. The claim on this page was true when written; it was the design that was wrong.</p>
+        </li>
+        <li>
+          <time datetime="2026-08-07">7 Aug 2026</time>
+          <p><b>The build log was written by hand.</b> It claimed every line carried a registry reference. The references were real, but a person chose which weeks to describe. The entries above are now generated from the tasks and findings tables, so the claim holds mechanically rather than on trust.</p>
+        </li>
         <li>
           <time datetime="2026-08-07">7 Aug 2026</time>
           <p><b>Tool count was wrong.</b> This page said thirty-nine tools; the registry exposes thirty-one. The figure had been written by hand. It is now derived from the tool list itself, so the two cannot drift apart again.</p>
@@ -536,7 +544,7 @@ register_signal_source project=<span class="s">"…"</span> kind=<span class="s"
           <input type="email" id="sub-email" name="email" placeholder="you@example.com" required autocomplete="email">
           <button type="submit">Subscribe</button>
         </form>
-        <p class="note">Stored as an address and a timestamp, in the same SQLite file as everything else. Reply to any message to be removed.</p>
+        <p class="note">Stored as an address and a timestamp, in a file of its own — never in the registry, and so never in a registry backup. Every message carries a one-click unsubscribe link.</p>
       </div>
     </div>
   </div>

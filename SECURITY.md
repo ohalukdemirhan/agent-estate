@@ -32,6 +32,24 @@ The countermeasure is the tool description, the leak guard in
 `tools/redact.py`, and review — in that order of reliability, which is to say:
 weak, medium, strong.
 
+## The public sign-up endpoint
+
+The newsletter endpoint is the only unauthenticated writer in the system, so
+it is kept out of the registry entirely (`ECOM_SUBSCRIBERS_DB`, a separate
+file). Three reasons, in descending order of severity:
+
+1. **Backups.** `create_backup` pushes the registry to a git remote.
+   Addresses in that file would be published with every snapshot and would
+   remain in git history afterwards.
+2. **Write contention.** SQLite has a single writer. A flood against a public
+   endpoint sharing the registry file can block an agent's `log_result`.
+3. **Input provenance.** The tool surface is meant to be the only way into
+   the record. A public form writing to the same file makes that untrue, and
+   anything an anonymous caller stores there reaches an agent's context the
+   day someone writes a tool that reads it.
+
+`init_db()` refuses to start if the two paths resolve to the same file.
+
 ## Rotation
 
 Rotating `ECOM_API_TOKEN` severs every connected agent mid-session, and an

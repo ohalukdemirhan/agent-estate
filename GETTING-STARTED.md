@@ -80,6 +80,26 @@ python3 tools/publish.py --db "$ECOM_DB_PATH" --push --key ~/.ssh/deploy_key
 
 Run it on a timer; it is idempotent and silent when nothing changed.
 
+```cron
+*/15 * * * * cd /opt/agent-estate && python3 tools/publish.py \
+  --db "$ECOM_DB_PATH" --out docs/index.html --push \
+  --key /etc/agent-estate/deploy_key \
+  --denylist /etc/agent-estate/denylist.txt >> /var/log/agent-estate.log 2>&1
+```
+
+Two files belong outside the repository, both mode `600`:
+
+- **the deploy key**, with write access to this repository only — never
+  account-wide, and never in the environment of anything that runs
+  agent-authored code;
+- **`denylist.txt`**, one estate-specific string per line: real project
+  names, hostnames, domains. Committing that list would itself be the
+  disclosure, which is why the guard's built-in patterns are structural.
+
+Set `ECOM_PSEUDONYM_SALT` once and leave it alone — the salt is what makes
+`holding-A` mean the same holding next week. Changing it reshuffles every
+label on the page.
+
 ## A few resources
 
 - **[The specification](SPEC.md)** — conformance list at the end; write your
