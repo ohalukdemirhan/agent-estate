@@ -13,6 +13,29 @@ If this is your first time here, read in this order:
 3. **[ANONYMITY.md](ANONYMITY.md)** — only if you intend to publish from a
    live record. It explains the leak guard and what it cannot do.
 
+```mermaid
+flowchart LR
+    subgraph M10 ["⏱️ first ten minutes"]
+        direction LR
+        C1["clone + <code>.env</code><br/><small>openssl rand -hex 32</small>"] --> C2["<code>docker compose up -d</code>"] --> C3["declare <code>ecom</code><br/>in any MCP client"] --> C4["the four first calls<br/><small>system_status → create_project<br/>→ register_agent → register_signal_source</small>"]
+    end
+    subgraph W1 ["📆 first week"]
+        direction LR
+        D1["one line in the<br/>system prompt"] --> D2["agents read at the start,<br/>write at the end"] --> D3["the record starts<br/>answering questions"]
+    end
+    M10 --> W1
+
+    style M10 fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    style W1 fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#0f172a
+    style C1 fill:#f8fafc,stroke:#2563eb,color:#0f172a
+    style C2 fill:#f8fafc,stroke:#2563eb,color:#0f172a
+    style C3 fill:#f8fafc,stroke:#2563eb,color:#0f172a
+    style C4 fill:#f8fafc,stroke:#2563eb,color:#0f172a
+    style D1 fill:#f8fafc,stroke:#059669,color:#0f172a
+    style D2 fill:#f8fafc,stroke:#059669,color:#0f172a
+    style D3 fill:#f8fafc,stroke:#059669,color:#0f172a
+```
+
 ## Your first ten minutes
 
 ```bash

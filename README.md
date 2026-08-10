@@ -6,6 +6,14 @@
 
 Protocol name `ecom` · MCP over HTTP · one SQLite file · MIT
 
+[![spec](https://img.shields.io/badge/spec-v1-2563eb?style=flat-square)](SPEC.md)
+[![transport](https://img.shields.io/badge/transport-MCP%20over%20HTTP-7c3aed?style=flat-square)](https://modelcontextprotocol.io)
+[![store](https://img.shields.io/badge/store-SQLite%20%C2%B7%20one%20file-059669?style=flat-square)](SPEC.md#3-data-model)
+[![tools](https://img.shields.io/badge/tools-31-d97706?style=flat-square)](SPEC.md#4-tool-surface)
+[![laws](https://img.shields.io/badge/laws-7%20enforced%20in%20the%20store-dc2626?style=flat-square)](SPEC.md#2-the-seven-laws)
+[![human gate](https://img.shields.io/badge/human%20gate-approve__plan-be185d?style=flat-square)](SPEC.md#2-the-seven-laws)
+[![license](https://img.shields.io/badge/license-MIT-334155?style=flat-square)](LICENSE)
+
 [Getting started](GETTING-STARTED.md) · [Specification](SPEC.md) · [Threat model](SECURITY.md) · [Anonymity](ANONYMITY.md)
 
 </div>
@@ -25,6 +33,20 @@ It does not schedule work. It does not run work. It holds no secrets. It
 authorises nothing. It records — and exactly one act in the whole system
 belongs to a person: `approve_plan`.
 
+```mermaid
+flowchart LR
+    A["🤖 agents<br/><i>transient, forgetful</i>"] -->|MCP over HTTP<br/>one bearer token| R
+    R["🏛️ <b>the registry</b><br/>31 tools · 7 laws<br/>one SQLite file"] --> P["🕵️ publish.py<br/><i>no LLM in the loop</i>"]
+    P -->|structural leak guard<br/>fails closed| S["🌐 public page<br/><code>site/</code>"]
+    H["🧑 a person"] -.->|approve_plan<br/><b>the only human act</b>| R
+
+    style A fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
+    style R fill:#dbeafe,stroke:#2563eb,stroke-width:3px,color:#0f172a
+    style P fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    style S fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#0f172a
+    style H fill:#fce7f3,stroke:#be185d,stroke-width:2px,color:#0f172a
+```
+
 ## Five chambers, thirty-one tools
 
 | Chamber | Holds | Tools |
@@ -40,6 +62,26 @@ The chain is the point: an observation becomes a **signal**; a signal becomes
 evidence for a **finding**; an accepted finding becomes a **task**; the task is
 planned, gated by a person, and appends a **result** that never erases the
 attempt before it.
+
+```mermaid
+flowchart LR
+    O(["👁️ observation<br/><i>measured</i>"]) --> SG["📡 <b>signal</b><br/>dedupe_key<br/><small>law I</small>"]
+    SG --> F["🔬 <b>finding</b><br/>severity × confidence<br/><small>law V</small>"]
+    F --> AC{{"⚖️ decide_finding<br/><i>accepted?</i><br/><small>law VI</small>"}}
+    AC --> T["🛠️ <b>task</b><br/>DAG of blockers<br/><small>law IV</small>"]
+    T --> G["🧑 approve_plan<br/><b>the human gate</b><br/><small>law III</small>"]
+    G --> RS["🧾 <b>result</b><br/>appended, never replaced<br/><small>law II</small>"]
+    SG -.->|evidence_signal_ids| F
+    RS -.->|becomes the next observation| O
+
+    style O fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#0f172a
+    style SG fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#0f172a
+    style F fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a
+    style AC fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a
+    style T fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    style G fill:#fce7f3,stroke:#be185d,stroke-width:3px,color:#0f172a
+    style RS fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+```
 
 Read [SPEC.md](SPEC.md) — the specification is the project. The server here is
 one implementation of it.

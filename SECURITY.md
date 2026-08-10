@@ -4,6 +4,33 @@ Stated by the authors rather than discovered by you. Everything below is a
 known, deliberate limit of v1. If one of these is unacceptable for your estate,
 do not deploy this — or fix it and send the patch.
 
+```mermaid
+flowchart TB
+    subgraph TRUSTED ["🔒 inside the trust boundary — one token grants all of it"]
+        direction LR
+        REG[("🏛️ registry<br/><code>registry.sqlite</code><br/><i>one file, plain text</i>")]
+        BK["📦 create_backup<br/>→ git remote"]
+        REG --> BK
+    end
+    subgraph OUTSIDE ["🌍 outside — deliberately separate"]
+        SUB[("✉️ subscribers<br/><code>ECOM_SUBSCRIBERS_DB</code>")]
+        PUB["🌐 published page"]
+    end
+    AG["🤖 agents"] -->|Bearer token<br/>read + write, every chamber| REG
+    ANON["👤 anonymous public"] -->|newsletter sign-up<br/><b>the only unauthenticated writer</b>| SUB
+    REG -->|publish.py + leak guard<br/><i>fails closed</i>| PUB
+    SUB ---|"❌ never the same file —<br/>init_db refuses to start"| REG
+
+    style TRUSTED fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#0f172a
+    style OUTSIDE fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#0f172a
+    style REG fill:#fecaca,stroke:#dc2626,stroke-width:2px,color:#0f172a
+    style BK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    style AG fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
+    style ANON fill:#f8fafc,stroke:#475569,stroke-width:2px,color:#0f172a
+    style SUB fill:#f8fafc,stroke:#475569,stroke-width:2px,color:#0f172a
+    style PUB fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#0f172a
+```
+
 ## What the registry assumes
 
 - **One token, one estate, no roles.** The bearer token in

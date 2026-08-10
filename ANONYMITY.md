@@ -23,6 +23,24 @@ Neither blocks a careless commit message.
 than a list of known secrets, because a list of known secrets committed to a
 public repository is itself the disclosure.
 
+```mermaid
+flowchart LR
+    DB[("🗄️ live registry<br/><i>real names, real hosts</i>")] --> PROJ["🎭 projection<br/><small>allowlist of fields per table</small>"]
+    PROJ --> PS["salted pseudonyms<br/><code>holding-A</code> · <code>agent-01</code><br/>models → class"]
+    PS --> GUARD{{"🚨 <b>structural leak guard</b><br/>e-mail · IPv4 · bearer · private key<br/>home path · unknown domain · store id"}}
+    GUARD -->|clean| OUT["🌐 <code>docs/index.html</code><br/>commit + push"]
+    GUARD -->|any match| STOP["🛑 <b>fails closed</b><br/>nothing written, nothing pushed<br/>exit non-zero, names the line"]
+    DL["📄 denylist.txt<br/><i>kept outside the repo</i>"] -.-> GUARD
+
+    style DB fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a
+    style PROJ fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    style PS fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
+    style GUARD fill:#fecaca,stroke:#dc2626,stroke-width:3px,color:#0f172a
+    style OUT fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#0f172a
+    style STOP fill:#0f172a,stroke:#dc2626,stroke-width:3px,color:#f8fafc
+    style DL fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#0f172a
+```
+
 Patterns rejected:
 
 | Class | Example shape |

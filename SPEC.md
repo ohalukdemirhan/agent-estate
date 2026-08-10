@@ -29,6 +29,30 @@ A conformant implementation enforces these at write time. If a law is only
 described in documentation or a system prompt, the implementation is not
 conformant — an agent that has read no prompt must still be unable to break it.
 
+```mermaid
+flowchart TB
+    subgraph WRITE ["✍️ the write path — where every law is enforced"]
+        direction LR
+        I["<b>I</b> · nothing enters twice<br/><code>dedupe_key</code> unique per project"]
+        II["<b>II</b> · appended, never overwritten<br/><code>log_result</code> · <code>append_env_note</code>"]
+        III["<b>III</b> · nothing on an agent's say-so<br/><code>approve_plan</code> — the human gate"]
+        IV["<b>IV</b> · work cannot wait upon itself<br/>cyclic edge rejected → DAG"]
+        V["<b>V</b> · a claim names its evidence<br/>severity ⟂ confidence"]
+        VI["<b>VI</b> · a refusal is recorded<br/>note required to reject"]
+        VII["<b>VII</b> · no secret enters<br/>plain text, by design"]
+    end
+    WRITE --> STORE[("🗄️ the store<br/><i>not the prompt</i>")]
+
+    style I fill:#d1fae5,stroke:#059669,color:#0f172a
+    style II fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    style III fill:#fce7f3,stroke:#be185d,stroke-width:3px,color:#0f172a
+    style IV fill:#fef3c7,stroke:#d97706,color:#0f172a
+    style V fill:#fee2e2,stroke:#dc2626,color:#0f172a
+    style VI fill:#fee2e2,stroke:#dc2626,color:#0f172a
+    style VII fill:#e2e8f0,stroke:#475569,color:#0f172a
+    style STORE fill:#0f172a,stroke:#0f172a,stroke-width:2px,color:#f8fafc
+```
+
 **I. Nothing enters twice.**
 Every signal carries a caller-supplied `dedupe_key`, unique per project.
 Writing the same key again updates the existing row. Re-ingesting the same
@@ -71,6 +95,65 @@ nowhere.
 
 Seven tables. SQLite in the reference implementation; nothing depends on that.
 
+```mermaid
+erDiagram
+    projects ||--o{ signals : "observed in"
+    projects ||--o{ signal_sources : "declared for"
+    projects ||--o{ findings : "concluded about"
+    projects ||--o{ tasks : "attempted on"
+    agents   ||--o{ tasks : "assigned"
+    tasks    ||--o{ task_results : "appends (law II)"
+    tasks    ||--o{ task_dependencies : "blocked by (law IV)"
+    findings }o--o{ signals : "evidence_signal_ids (law V)"
+    findings ||--o| findings : "superseded_by_id"
+
+    projects {
+        text name UK "the handle every tool takes"
+        text type "mobile_app · web_app · website · internal_tool · ai_factory"
+        text env_notes "append-only, timestamped (law II)"
+        text status "active · archived"
+    }
+    agents {
+        text name UK "re-registering updates"
+        text role "free text"
+        json capabilities "tags"
+        text status "idle · working · disabled"
+        ts last_seen_at "heartbeat_agent"
+    }
+    tasks {
+        json input "the assignment"
+        text plan "submit_plan"
+        ts plan_approved_at "cleared on re-submit (law III)"
+        text status "pending · running · succeeded · failed · cancelled"
+    }
+    task_results {
+        text status
+        json meta "tokens, cost — free-form"
+        ts created_at "one row per attempt"
+    }
+    task_dependencies {
+        int task_id
+        int blocked_by "cycle rejected (law IV)"
+    }
+    signals {
+        text kind "open vocabulary"
+        text value "text: REJECTED and 0.394 in one column"
+        text dedupe_key UK "unique per project (law I)"
+        ts observed_at
+    }
+    signal_sources {
+        text kind "crashlytics · analytics · store_reviews · backend_logs · manual"
+        json config "addressing only (law VII)"
+    }
+    findings {
+        text kind "design · technical · product"
+        int severity "1-5 · how much is lost now"
+        int confidence "1-5 · how directly measured"
+        text status "open · accepted · rejected · superseded · resolved"
+        text decision_note "required to reject or resolve (law VI)"
+    }
+```
+
 ### 3.1 `projects`
 | column | type | notes |
 |---|---|---|
@@ -110,6 +193,29 @@ Seven tables. SQLite in the reference implementation; nothing depends on that.
 | `status` | text | `pending` · `running` · `succeeded` · `failed` · `cancelled` |
 | `created_at` / `started_at` / `completed_at` | timestamp null | |
 
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> pending : assign_task
+    pending --> pending : submit_plan — voids prior approval (law III)
+    pending --> running : log_result(running)<br/>only after approve_plan 🧑
+    running --> succeeded : log_result(succeeded)
+    running --> failed : log_result(failed)
+    failed --> running : retry — prior result kept (law II)
+    pending --> cancelled : log_result(cancelled)
+    succeeded --> [*]
+
+    note right of pending
+        approve_plan is the human gate:
+        the only act in the whole system
+        that belongs to a person
+    end note
+    note right of failed
+        four failures then a success
+        leaves five rows, not one
+    end note
+```
+
 ### 3.4 `task_results`
 Append-only (law II). `id`, `task_id`, `status`, `output`, `error`,
 `meta` (free-form json, e.g. `{"tokens":1200,"cost":0.03}`), `created_at`.
@@ -148,12 +254,70 @@ only**, law VII), `enabled`.
 | `decided_by` / `decided_at` / `decision_note` | text / ts / text null | note required for `rejected` and `resolved` (law VI) |
 | `superseded_by_id` | fk null | |
 
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> open : create_finding<br/>(severity, confidence, evidence)
+    open --> accepted : decide_finding — becomes a task
+    open --> rejected : decide_finding<br/>note REQUIRED (law VI)
+    open --> superseded : a better finding replaces it
+    accepted --> resolved : decide_finding<br/>note REQUIRED (law VI)
+    rejected --> [*]
+    resolved --> [*]
+
+    note left of open
+        severity = how much is being lost now
+        confidence = how directly it was measured
+        never conflated (law V)
+    end note
+    note right of rejected
+        without the reason, the same bad idea
+        returns next week, proposed by an agent
+        with no memory of the last one
+    end note
+```
+
 ---
 
 ## 4. Tool surface
 
 Thirty-one tools. There is no other way into the store — no REST side door, no
 direct SQL for agents.
+
+```mermaid
+flowchart TB
+    subgraph E ["🏠 Estates — 6"]
+        E1["list_projects · get_project · create_project<br/>update_project · append_env_note · set_latest_commit"]
+    end
+    subgraph A ["🤖 Agents — 4"]
+        A1["register_agent · list_agents<br/>set_agent_status · heartbeat_agent"]
+    end
+    subgraph T ["🛠️ Tasks — 10"]
+        T1["assign_task · get_task · list_tasks · ready_tasks<br/>submit_plan · <b>approve_plan 🧑</b> · log_result<br/>add_task_dependency · remove_task_dependency · task_blockers"]
+    end
+    subgraph S ["📡 Signals — 4"]
+        S1["record_signal · list_signals<br/>register_signal_source · list_signal_sources"]
+    end
+    subgraph F ["🔬 Findings — 5"]
+        F1["create_finding · get_finding · list_findings<br/>add_finding_evidence · decide_finding"]
+    end
+    subgraph X ["🏛️ The estate itself — 2"]
+        X1["system_status · create_backup"]
+    end
+
+    style E fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    style A fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
+    style T fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    style S fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#0f172a
+    style F fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a
+    style X fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#0f172a
+    style E1 fill:#f8fafc,stroke:#2563eb,color:#0f172a
+    style A1 fill:#f8fafc,stroke:#7c3aed,color:#0f172a
+    style T1 fill:#f8fafc,stroke:#d97706,color:#0f172a
+    style S1 fill:#f8fafc,stroke:#059669,color:#0f172a
+    style F1 fill:#f8fafc,stroke:#dc2626,color:#0f172a
+    style X1 fill:#f8fafc,stroke:#475569,color:#0f172a
+```
 
 ### Estates — 6
 | tool | purpose |
@@ -241,11 +405,23 @@ record what it did.
 
 The chambers are one chain, and the chain is the point:
 
-```
-  measured        read              decided           planned      gated      run
-observation  →  signal  →  finding  →  accepted  →  task  →  approve_plan  →  result
-                    ↖______ evidence_signal_ids ______↙                          │
-                                                                     appended, never replaced
+```mermaid
+flowchart LR
+    OB(["👁️ observation<br/><i>measured</i>"]) -->|record_signal| SG["📡 signal<br/><small>dedupe_key · law I</small>"]
+    SG -->|read| FD["🔬 finding<br/><small>severity ⟂ confidence · law V</small>"]
+    FD -->|decide_finding| AC["✅ accepted<br/><small>a rejection needs a note · law VI</small>"]
+    AC -->|assign_task| TK["🛠️ task<br/><small>ready only when blockers succeed · law IV</small>"]
+    TK -->|submit_plan| GT["🧑 approve_plan<br/><b>the human gate</b><br/><small>law III</small>"]
+    GT -->|log_result| RS["🧾 result<br/><small>appended, never replaced · law II</small>"]
+    SG -.->|evidence_signal_ids| FD
+
+    style OB fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#0f172a
+    style SG fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#0f172a
+    style FD fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a
+    style AC fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a
+    style TK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    style GT fill:#fce7f3,stroke:#be185d,stroke-width:3px,color:#0f172a
+    style RS fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
 ```
 
 Each link is enforced rather than encouraged: an evidence-free finding must
