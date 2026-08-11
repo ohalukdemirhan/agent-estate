@@ -1,6 +1,6 @@
 <div align="center">
 
-# Agent Estate
+# Agent EstateMCP
 
 **A registry an autonomous agent writes to, so that an estate of software can be run without human workers.**
 
